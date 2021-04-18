@@ -40,7 +40,7 @@ app.post('/api/sendEmail', async (req, res) => {
             const recaptcha_json = await response.json()
 
             if (recaptcha_json.success) {
-                if (transporter.sendMail($recipient, "Message from ".$name, $msg, $headers)) {
+                if (transporter.sendMail(mailOptions)) {
                     res.sendStatus(202) // (Accepted) Email sent!
                 } else {
                     res.sendStatus(500) //Error: (Internal Error) Email not sent.
