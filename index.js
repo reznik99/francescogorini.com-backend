@@ -36,7 +36,7 @@ app.post('/api/sendEmail', async (req, res) => {
 
         if (req.body.recaptcha_response) {
             // Send request and decode response:
-            const recaptcha = await fetch(`https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${req.body.recaptcha_response}`)
+            const response = await fetch(`https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${req.body.recaptcha_response}`)
             const recaptcha_json = await response.json()
 
             if (recaptcha_json.success) {
