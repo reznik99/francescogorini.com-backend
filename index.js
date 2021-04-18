@@ -36,20 +36,28 @@ app.post('/api/sendEmail', async (req, res) => {
 
         if (req.body.recaptcha_response) {
             // Send request and decode response:
-            const response = await fetch(`https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${req.body.recaptcha_response}`)
-            const recaptcha_json = await response.json()
+            try {
+                const response = await fetch(`https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${req.body.recaptcha_response}`)
+                const recaptcha_json = await response.json()
 
-            if (recaptcha_json.success) {
-                if (transporter.sendMail(mailOptions)) {
-                    res.sendStatus(202) // (Accepted) Email sent!
+                if (recaptcha_json.success) {
+                    if (transporter.sendMail(mailOptions)) {
+                        res.sendStatus(202) // (Accepted) Email sent!
+                        console.log(`Successful sendEmail for ${sender}.`)
+                    } else {
+                        res.sendStatus(500) //Error: (Internal Error) Email not sent.
+                        console.warn("Attempted sendEmail failed.")
+                    }
                 } else {
-                    res.sendStatus(500) //Error: (Internal Error) Email not sent.
+                    res.sendStatus(403) //Error: (Forbidden) Email not sent. Captcha FAILED!
+                    console.warn("Attempted sendEmail with invalid recaptcha_response.")
                 }
-            } else {
-                res.sendStatus(403) //Error: (Forbidden) Email not sent. Captcha FAILED!
+            } catch (e) {
+                console.error(`Error, sendMail request failed:\n${e}`)
             }
         } else {
             res.sendStatus(403) //Error: (Forbidden) Email not sent. Captcha FAILED!
+            console.warn("Attempted sendEmail without recaptcha_response.")
         }
     }
 });
