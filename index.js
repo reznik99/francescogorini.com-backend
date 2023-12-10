@@ -1,13 +1,12 @@
 import express from 'express';
 import axios from 'axios';
 import bodyParser from 'body-parser'
-import * as dotenv from "dotenv";
 import { createTransport } from 'nodemailer';
+import "dotenv/config";
 
 const transporter = createTransport({ sendmail: true }) // Auth-less
 const app = express()
 
-dotenv.config();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -40,9 +39,8 @@ app.post('/api/sendEmail', async (req, res) => {
 
     try {
         const response = await axios.get(`${process.env.RECAPTCHA_URL}?secret=${process.env.RECAPTCHA_SECRET}&response=${recaptcha_response}`)
-        const recaptcha_json = await response.json()
 
-        if (!recaptcha_json.success) {
+        if (!response.data.success) {
             console.warn("Attempted Email with invalid recaptcha_response.")
             res.status(403).send("Email not sent. Captcha FAILED!")
             return
