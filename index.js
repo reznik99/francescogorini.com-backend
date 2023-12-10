@@ -1,64 +1,59 @@
-require('dotenv').config()
-const fetch = require('node-fetch')
-const nodemailer = require('nodemailer')
-const bodyParser = require('body-parser');
-const express = require('express')
+import express from 'express';
+import axios from 'axios';
+import bodyParser from 'body-parser'
+import * as dotenv from "dotenv";
+import { createTransport } from 'nodemailer';
 
-// Express Middleware
+const transporter = createTransport({ sendmail: true }) // Auth-less
 const app = express()
+
+dotenv.config();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// Nodemailer
-let transporter = nodemailer.createTransport({ sendmail: true }) // Auth-less
+const messageToEmailBody = (name, message, email) => {
+    return `Message from ${name}.\n\n${message}.\n\nReply to this email will automatically reply-to:${email}`
+}
 
 // Routes
-app.get('/', (req, res) => {
-    return res.send('Received a GET HTTP method');
-});
-
 app.post('/api/sendEmail', async (req, res) => {
-    console.log(req.body)
-    if (req.body.name && req.body.email && req.body.message) {
-        //save variables
-        let name = req.body.name;
-        let sender = req.body.email;
-        let msg = `Message from ${name}.\n\n ${req.body.message}.\n\nReply to this email will automatically reply-to:${sender}`
+    const { name, email, message, recaptcha_response } = req.body
 
-        mailOptions = {
-            from: "portfolio",               // sender address
-            to: process.env.RECIPIENT,       // list of receivers
-            replyTo: sender,
-            subject: `Message from ${name}`, // Subject line
-            text: msg,                       // plaintext body
-            html: ""                         // html body
+    if (!name || !email || !message) {
+        console.error(`Unable to send email with missing data. Requires 'name', 'email' and 'message'.`)
+        res.status(403).send("Unable to send email with missing data. Requires 'name', 'email' and 'message'.")
+        return
+    }
+    if (!recaptcha_response) {
+        console.warn("Attempted Email without recaptcha_response.")
+        res.status(403).send("Email not sent. Captcha FAILED!")
+        return
+    }
+
+    const mailOptions = {
+        from: "portfolio",
+        to: process.env.RECIPIENT,
+        replyTo: email,
+        subject: `Message from ${name}`,
+        text: messageToEmailBody(name, message, email),
+    }
+
+    try {
+        const response = await axios.get(`${process.env.RECAPTCHA_URL}?secret=${process.env.RECAPTCHA_SECRET}&response=${recaptcha_response}`)
+        const recaptcha_json = await response.json()
+
+        if (!recaptcha_json.success) {
+            console.warn("Attempted Email with invalid recaptcha_response.")
+            res.status(403).send("Email not sent. Captcha FAILED!")
+            return
         }
 
-        if (req.body.recaptcha_response) {
-            // Send request and decode response:
-            try {
-                const response = await fetch(`https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${req.body.recaptcha_response}`)
-                const recaptcha_json = await response.json()
-
-                if (recaptcha_json.success) {
-                    if (transporter.sendMail(mailOptions)) {
-                        res.sendStatus(202) // (Accepted) Email sent!
-                        console.log(`Successful sendEmail for ${sender}.`)
-                    } else {
-                        res.sendStatus(500) //Error: (Internal Error) Email not sent.
-                        console.warn("Attempted sendEmail failed.")
-                    }
-                } else {
-                    res.sendStatus(403) //Error: (Forbidden) Email not sent. Captcha FAILED!
-                    console.warn("Attempted sendEmail with invalid recaptcha_response.")
-                }
-            } catch (e) {
-                console.error(`Error, sendMail request failed:\n${e}`)
-            }
-        } else {
-            res.sendStatus(403) //Error: (Forbidden) Email not sent. Captcha FAILED!
-            console.warn("Attempted sendEmail without recaptcha_response.")
-        }
+        await transporter.sendMail(mailOptions)
+        console.log(`${email} sent an email.`)
+        res.status(202).send()
+    } catch (err) {
+        console.error(`Send Email request failed:`, err)
+        res.status(500).send("Email not sent")
     }
 });
 
