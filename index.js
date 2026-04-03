@@ -32,7 +32,7 @@ app.post('/api/sendEmail', async (req, res) => {
     }
 
     const mailOptions = {
-        from: "portfolio",
+        from: process.env.SENDER,
         to: process.env.RECIPIENT,
         replyTo: email,
         subject: `Message from ${name}`,
